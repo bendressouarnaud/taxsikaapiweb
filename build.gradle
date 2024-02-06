@@ -16,10 +16,30 @@ repositories {
 	mavenCentral()
 }
 
+ext {
+	set 'lombokVersion', '1.18.28'
+	set 'liquibaseVersion', '4.25.1'
+}
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
+
+	implementation("org.postgresql:postgresql")
+	implementation("org.springframework.boot:spring-boot-starter-jdbc")
+	implementation 'org.springframework.security:spring-security-config:5.4.5'
+	implementation 'org.projectlombok:lombok:1.18.26'
+	implementation 'org.springframework.data:spring-data-jpa:3.2.2'
+
+	implementation 'io.jsonwebtoken:jjwt:0.9.1'
+	implementation 'org.apache.tomcat:tomcat-jdbc:9.0.80'
+	implementation project(path: ':bendressouarnaud')
+
+	compileOnly "org.projectlombok:lombok:${lombokVersion}"
+	annotationProcessor "org.projectlombok:lombok:${lombokVersion}"
+	annotationProcessor 'org.hibernate.orm:hibernate-jpamodelgen:6.2.7.Final'
+
 	providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework.security:spring-security-test'
