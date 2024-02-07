@@ -4,6 +4,7 @@ import com.ankk.tasikaapiweb.repositories.ProfilRepository;
 import com.ankk.tasikaapiweb.repositories.UtilisateurRepository;
 import com.ankk.taxsika.models.Profil;
 import com.ankk.taxsika.models.Utilisateur;
+import jakarta.persistence.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -11,7 +12,6 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
-import javax.persistence.*;
 import java.util.List;
 
 @Service
