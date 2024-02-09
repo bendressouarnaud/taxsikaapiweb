@@ -8,7 +8,7 @@ import java.util.List;
 public interface UtilisateurRepository extends CrudRepository<Utilisateur, Long> {
 
     Utilisateur findByIdentifiant(String identifiant);
-    //Utilisateur findByEmail(String email);
+    Utilisateur findByEmail(String email);
     //Utilisateur findByIdentifiantAndMotdepasse(String id, String pwd);
     //List<Utilisateur> findAllByOrderByNomAsc();
     //Utilisateur findByToken(String token);

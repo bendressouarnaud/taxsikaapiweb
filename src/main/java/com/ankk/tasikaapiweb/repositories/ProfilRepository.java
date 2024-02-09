@@ -7,5 +7,6 @@ import java.util.List;
 public interface ProfilRepository extends CrudRepository<Profil, Long> {
 
     List<Profil> findAllByOrderByLibelleAsc();
+    Profil findById(int id);
 
 }
