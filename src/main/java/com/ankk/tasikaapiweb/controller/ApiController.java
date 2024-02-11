@@ -1,22 +1,37 @@
 package com.ankk.tasikaapiweb.controller;
 
+import com.ankk.tasikaapiweb.mesbeans.BeanProfil;
 import com.ankk.tasikaapiweb.mesbeans.Reponse;
+import com.ankk.tasikaapiweb.mesbeans.ReponseUserFulNew;
+import com.ankk.tasikaapiweb.mesbeans.UserLog;
 import com.ankk.tasikaapiweb.repositories.MairieRepository;
 import com.ankk.tasikaapiweb.repositories.ProfilRepository;
+import com.ankk.tasikaapiweb.repositories.QuartierRepository;
 import com.ankk.tasikaapiweb.repositories.UtilisateurRepository;
 import com.ankk.tasikaapiweb.securite.JwtUtil;
+import com.ankk.tasikaapiweb.securite.UserDetailsServiceImp;
+import com.ankk.tasikaapiweb.service.TrousseOutil;
 import com.ankk.taxsika.models.Mairie;
 import com.ankk.taxsika.models.Profil;
+import com.ankk.taxsika.models.Quartier;
 import com.ankk.taxsika.models.Utilisateur;
+import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.web.bind.annotation.*;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
@@ -24,27 +39,123 @@ import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.Base64;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequiredArgsConstructor
 public class ApiController {
 
     // Attribute :
+    private final QuartierRepository quartierRepository;
     private final MairieRepository mairieRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final ProfilRepository profilRepository;
     private final JwtUtil jwtUtil;
+    private final TrousseOutil trousseOutil;
+    private final AuthenticationManager authenticationManager;
+    private final UserDetailsServiceImp userDetailsServiceImp;
     @Value("${aes.algorithm.key}")
     String javaAesKey;
-    @Value("${aes.algorithm.chaing}")
+    @Value("${aes.algorithm.chain}")
     String javaAesChain;
 
 
 
     // M E T H O D S :
+    @PostConstruct
+    private void initUser(){
+
+
+        /*
+        Mairie mairie = new Mairie();
+        mairie.setLibelle("Abengourou");
+        mairie.setCode("ABG");
+        mairie.setCle("ABG");
+        mairie.setMonnaie("FCFA");
+        mairie.setIdentifiant("1234");
+
+        Profil pl = new Profil();
+        pl.setLibelle("Administrateur");
+        pl.setCode("admin");
+        profilRepository.save(pl);
+
+        Profil pl1 = new Profil();
+        pl1.setLibelle("Superadministrateur");
+        pl1.setCode("supadmin");
+        profilRepository.save(pl1);
+
+        Utilisateur usr = new Utilisateur();
+        // Feed :  HH:mm:ss
+        String heure = new SimpleDateFormat("HH:mm:ss").format(new Date());
+        //
+        usr.setMotdepasse( trousseOutil.encrypt(heure.replace(":",""), javaAesKey, javaAesChain));          ;
+        usr.setNom("admin");
+        usr.setPrenom("admin");
+        usr.setContact("0620814327");
+        usr.setEmail("bendressouarnaud@gmail.com");
+        // Get the PROFIL :
+        usr.setProfil(pl);
+        usr.setToken("");
+        usr.setFcmtoken("");
+        usr.setMairie(mairieRepository.save(mairie));
+        //
+        utilisateurRepository.save(usr);*/
+
+        //
+        Utilisateur tp = utilisateurRepository.findAllByOrderByNomAsc().get(0);
+        System.out.println("Usr : "+
+                trousseOutil.decrypt(tp.getMotdepasse(), javaAesKey, javaAesChain)
+        );
+    }
+
+
+    @CrossOrigin("*")
+    @PostMapping(value="/authentification")
+    private ResponseEntity<?> authentification(
+            @RequestBody UserLog userLog) throws Exception {
+        Utilisateur utilisateur =
+                utilisateurRepository.findByEmail(userLog.getIdentifiant())
+                        .orElseThrow(() -> new UsernameNotFoundException("User Not Found with username: " +
+                                userLog.getIdentifiant()));
+        Map<String, Object> stringMap = new HashMap<>();
+        // Decrypt Pasword :
+        String getPwd = trousseOutil.decrypt(
+                utilisateur.getMotdepasse(), javaAesKey, javaAesChain);
+        if(getPwd.equals(userLog.getMotdepasse())){
+            try {
+                authenticationManager.authenticate(
+                        new UsernamePasswordAuthenticationToken(
+                                userLog.getIdentifiant(), utilisateur.getMotdepasse()
+                        )
+                );
+            } catch (BadCredentialsException e) {
+                throw new Exception("Nom d'utilisateur ou mot de passe incorrect !");
+            }
+
+            //
+            UserDetails userDetails = userDetailsServiceImp.loadUserByUsername(userLog.getIdentifiant());
+            String jwt = jwtUtil.generateToken(userDetails);
+            stringMap.put("userexist", "1");
+            stringMap.put("code", String.valueOf(HttpStatus.OK.value()));
+            stringMap.put("data", jwt);
+
+            stringMap.put("profil", utilisateur.getProfil().getCode());
+            stringMap.put("identifiant", userLog.getIdentifiant());// ur.getIdentifiant()
+            // Now, in case the password is still 4 characters long,
+            //  redirect user to change the password :
+            stringMap.put("paswordchange", (userLog.getMotdepasse().trim().length() == 4) ? 0 : 1);
+
+            // Track the login :
+            //tachesService.trackJournal("Utilisateur connecté depuis l'application WEB",
+            //ur.getIduser());
+        }
+        else stringMap.put("userexist", "0");
+        return ResponseEntity.ok(stringMap);
+        //return null;
+    }
+
+
     @CrossOrigin("*")
     @GetMapping(value="/getallmairie")
     private List<Mairie> getallmairie(){
@@ -59,7 +170,7 @@ public class ApiController {
             @RequestParam(value="prenom") String prenom,
             @RequestParam(value="contact") String contact,
             @RequestParam(value="email") String email,
-            @RequestParam(value="profil") Integer idProfil,
+            @RequestParam(value="profil") long idProfil,
             HttpServletRequest request
     ){
 
@@ -68,23 +179,23 @@ public class ApiController {
 
         //
         String identifiant = getBackUserConnectedName(request);
-        Utilisateur ur = utilisateurRepository.findByEmail(identifiant);
+        Utilisateur ur = utilisateurRepository.findByEmail(identifiant).orElse(null);
 
         // Create or update 'Utilisateur'
-        Utilisateur usr = utilisateurRepository.findByEmail(email.trim()); //
+        Utilisateur usr = utilisateurRepository.findByEmail(email.trim()).orElse(null); //
         if(usr == null){
             // new ONE :
             usr = new Utilisateur();
             // Feed :
             String heure = new SimpleDateFormat("HH:mm:ss").format(new Date());
             //
-            usr.setMotdepasse( encrypt(heure.replace(":",""), javaAesKey, javaAesChain));          ;
+            usr.setMotdepasse( trousseOutil.encrypt(heure.replace(":",""), javaAesKey, javaAesChain));          ;
             usr.setNom(nom.trim());
             usr.setPrenom(prenom.trim());
             usr.setContact(contact.trim());
             usr.setEmail(email.trim());
             // Get the PROFIL :
-            Profil profil = profilRepository.findById(idProfil);
+            Profil profil = profilRepository.findById(idProfil).orElse(new Profil());
             usr.setProfil(profil);
             usr.setToken("");
             usr.setFcmtoken("");
@@ -104,20 +215,110 @@ public class ApiController {
         return rse;
     }
 
-    /*public String getToken(TblToken tn, String key, String aesAlgoRithm){
-        if(tn != null){
-            // Make the difference between CURRENT DATE and the ONE previous saved :
-            OffsetDateTime tempsSauvegarde = tn.getCreationDatetime();
-            OffsetDateTime odtNow = OffsetDateTime.now();
-            long difference = ChronoUnit.HOURS.between(tempsSauvegarde, odtNow);
-            if(difference < 8){
-                // Get TOKEN :
-                return decrypt(tn.getToken(), key, aesAlgoRithm);
+
+    @CrossOrigin("*")
+    @GetMapping(value="/getAllusers")
+    private List<ReponseUserFulNew> getAllusers(HttpServletRequest request){
+        //
+        String identifiant = getBackUserConnectedName(request);
+        Utilisateur ur = utilisateurRepository.findByEmail(identifiant)
+                .orElse(new Utilisateur());
+
+        // if Superadmin, pick 'Admin' users
+        List<Utilisateur> liste = ur.getProfil().getCode().equals("supadmin") ?
+            utilisateurRepository.findAllByProfil(profilRepository.findByCode("supadmin")) :
+                utilisateurRepository.
+                        findAllByMairieAndProfilIn(
+                                ur.getMairie(),
+                                profilRepository.findByCodeNot("supadmin"));
+        List<ReponseUserFulNew> retour = new ArrayList<>();
+        liste.forEach(
+                d -> {
+                    ReponseUserFulNew rw = new ReponseUserFulNew();
+                    rw.setContact(d.getContact());
+                    rw.setNom(d.getNom());
+                    rw.setPrenom(d.getPrenom());
+                    rw.setEmail(d.getEmail());
+                    rw.setProfil(d.getProfil().getLibelle());
+                    rw.setIduser(String.valueOf(d.getId()));
+                    rw.setIdmai("0");
+                    //rw.setIdmai(String.valueOf(d.getMairie().getId()));
+                    retour.add(rw);
+                }
+        );
+        return retour;
+        //return null;
+    }
+
+    @CrossOrigin("*")
+    @GetMapping(value="/getprofiliste")
+    private List<BeanProfil> getprofiliste(HttpServletRequest request){
+
+        String identifiant = getBackUserConnectedName(request);
+        Utilisateur ur = utilisateurRepository.findByEmail(identifiant)
+                .orElse(new Utilisateur());
+
+        List<Profil> retour = ur.getProfil().getId() == 1 ?
+                profilRepository.findByCodeNot("supadmin") :
+                profilRepository.findAllByOrderByLibelleAsc();
+        List<BeanProfil> listePro = retour.stream().map(
+                d -> {
+                    BeanProfil bl = new BeanProfil();
+                    bl.setLibelle(d.getLibelle());
+                    bl.setIdpro( Math.toIntExact(d.getId()));
+                    return bl;
+                }
+        ).toList();
+        return listePro;
+    }
+
+    @CrossOrigin("*")
+    @GetMapping(value="/getAllQuartiers")
+    private List<BeanProfil> getAllQuartiers(HttpServletRequest request){
+        String identifiant = getBackUserConnectedName(request);
+        Utilisateur ur = utilisateurRepository.findByEmail(identifiant)
+                .orElse(new Utilisateur());
+
+        List<Quartier> retour = quartierRepository.findAllByMairie(ur.getMairie());
+        List<BeanProfil> listePro = retour.stream().map(
+            d -> {
+                BeanProfil bl = new BeanProfil();
+                bl.setLibelle(d.getLibelle());
+                bl.setIdpro( Math.toIntExact(d.getId()));
+                return bl;
             }
+        ).toList();
+        return listePro;
+    }
+
+    @CrossOrigin("*")
+    @GetMapping(value="/enregistrerQuartier")
+    private Reponse enregistrerQuartier(
+            @RequestParam(value="libelle") String libelle,
+            @RequestParam(value="id") long id,
+            HttpServletRequest request
+    ){
+        //
+        Reponse rse = new Reponse();
+        //
+        String identifiant = getBackUserConnectedName(request);
+        Utilisateur ur = utilisateurRepository.findByEmail(identifiant)
+                .orElse(new Utilisateur());
+        //
+        Quartier quartier = quartierRepository.findById(id).orElse(null);
+        if(quartier == null){
+            quartier = new Quartier();
+            quartier.setMairie(ur.getMairie());
         }
-        // Default :
-        return "";
-    }*/
+        quartier.setLibelle(libelle);
+        id = quartierRepository.save(quartier).getId();
+
+        rse.setElement("ok");
+        rse.setProfil(String.valueOf(id));
+        rse.setIdentifiant("ok");
+        return rse;
+    }
+
 
     private String getBackUserConnectedName(HttpServletRequest request){
         //
@@ -129,42 +330,9 @@ public class ApiController {
             username = jwtUtil.getUsernameFromToken(token);
         }
         catch (Exception exc){
-
         }
         return username;
     }
 
-    private String encrypt(String wordToEncrypt, String key, String aesAlgoRithm) {
-        try {
-            SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "AES");
-            byte[] enCodeFormat = secretKey.getEncoded();
-            SecretKeySpec seckey = new SecretKeySpec(enCodeFormat, "AES");
-            Cipher cipher = Cipher.getInstance(aesAlgoRithm);//
-            cipher.init(Cipher.ENCRYPT_MODE, seckey);//
-            byte[] cipherText = cipher.doFinal(wordToEncrypt.getBytes());
-            return Base64.getEncoder()
-                    .encodeToString(cipherText);
-        }
-        catch (Exception e){
-            //log.error("Exception in encrypt(...) : ", e);
-            return "";
-        }
-    }
 
-    private String decrypt(String wordToDecrypt, String key, String aesAlgoRithm) {
-        try {
-            SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "AES");
-            byte[] enCodeFormat = secretKey.getEncoded();
-            SecretKeySpec seckey = new SecretKeySpec(enCodeFormat, "AES");
-            Cipher cipher = Cipher.getInstance(aesAlgoRithm);
-            cipher.init(Cipher.DECRYPT_MODE, seckey);
-            byte[] plainText = cipher.doFinal(Base64.getDecoder()
-                    .decode(wordToDecrypt));
-            return new String(plainText);
-        }
-        catch (Exception e){
-            //log.error("Exception in decrypt(...) : ", e);
-            return "";
-        }
-    }
 }

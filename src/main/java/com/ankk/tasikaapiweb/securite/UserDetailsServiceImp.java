@@ -27,30 +27,9 @@ public class UserDetailsServiceImp implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
 
-        EntityManager emr = emf.createEntityManager();
-        emr.getTransaction().begin();
-
-        // Demande de Rapports :
-        StoredProcedureQuery procedureQuery = emr
-                .createStoredProcedureQuery("findUserByIdentifier");
-        procedureQuery.registerStoredProcedureParameter("id",
-                String.class, ParameterMode.IN);
-        procedureQuery.setParameter("id", username);
-        procedureQuery.registerStoredProcedureParameter("keyword",
-                String.class, ParameterMode.IN);
-        procedureQuery.setParameter("keyword", "K8_jemange");
-        List<Object[]> resultat = procedureQuery.getResultList();
-
-        // Close :
-        emr.getTransaction().commit();
-        emr.close();
-
-        //
-        Utilisateur utilisateur = null;
-        if(resultat.size() > 0) {
-            utilisateur = utilisateurRepository.findByIdentifiant(
-                    String.valueOf(resultat.get(0)[1]));
-        }
+        Utilisateur utilisateur = utilisateurRepository.findByEmail(username)
+                .orElseThrow(() -> new UsernameNotFoundException("User Not Found with username: " + username));
+        //return UserDetailsImpl.build(utilisateur);
         //
         User.UserBuilder builder = null;
         if (utilisateur != null) {
@@ -59,7 +38,7 @@ public class UserDetailsServiceImp implements UserDetailsService {
             builder.password(utilisateur.getMotdepasse());
             //
             Profil profil =null;//= profilRepository.findByIdpro(utilisateur.getProfil());
-            builder.roles(profil.getLibelle());
+            builder.roles("admin");
         } else {
             throw new UsernameNotFoundException("User not found.");
         }
