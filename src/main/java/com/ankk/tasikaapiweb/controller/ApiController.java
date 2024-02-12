@@ -1,24 +1,16 @@
 package com.ankk.tasikaapiweb.controller;
 
-import com.ankk.tasikaapiweb.mesbeans.BeanProfil;
-import com.ankk.tasikaapiweb.mesbeans.Reponse;
-import com.ankk.tasikaapiweb.mesbeans.ReponseUserFulNew;
-import com.ankk.tasikaapiweb.mesbeans.UserLog;
-import com.ankk.tasikaapiweb.repositories.MairieRepository;
-import com.ankk.tasikaapiweb.repositories.ProfilRepository;
-import com.ankk.tasikaapiweb.repositories.QuartierRepository;
-import com.ankk.tasikaapiweb.repositories.UtilisateurRepository;
+import com.ankk.tasikaapiweb.mesbeans.*;
+import com.ankk.tasikaapiweb.repositories.*;
 import com.ankk.tasikaapiweb.securite.JwtUtil;
 import com.ankk.tasikaapiweb.securite.UserDetailsServiceImp;
 import com.ankk.tasikaapiweb.service.TrousseOutil;
-import com.ankk.taxsika.models.Mairie;
-import com.ankk.taxsika.models.Profil;
-import com.ankk.taxsika.models.Quartier;
-import com.ankk.taxsika.models.Utilisateur;
+import com.ankk.taxsika.models.*;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -47,6 +39,7 @@ import java.util.stream.Collectors;
 public class ApiController {
 
     // Attribute :
+    private final SecteurRepository secteurRepository;
     private final QuartierRepository quartierRepository;
     private final MairieRepository mairieRepository;
     private final UtilisateurRepository utilisateurRepository;
@@ -317,6 +310,19 @@ public class ApiController {
         rse.setProfil(String.valueOf(id));
         rse.setIdentifiant("ok");
         return rse;
+    }
+
+
+    @CrossOrigin("*")
+    @GetMapping(value="/getAllSecteurs")
+    private List<BeanQuartierSecteur> getAllSecteurs(HttpServletRequest request){
+        String identifiant = getBackUserConnectedName(request);
+        Utilisateur ur = utilisateurRepository.findByEmail(identifiant)
+                .orElse(new Utilisateur());
+        ModelMapper modelMapper = new ModelMapper();
+        return secteurRepository.findAllSecteurByMairie(ur.getMairie().getId()).
+                stream().map(d -> modelMapper.map(d, BeanQuartierSecteur.class))
+                .collect(Collectors.toList());
     }
 
 
